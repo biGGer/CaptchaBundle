@@ -73,21 +73,21 @@ class Image extends Word
      *
      * @var int
      */
-    protected $_width = 200;
+    protected $_width = 100;
 
     /**
      * Image height
      *
      * @var int
      */
-    protected $_height = 50;
+    protected $_height = 40;
 
     /**
      * Font size
      *
      * @var int
      */
-    protected $_fsize = 22;
+    protected $_fsize = 12;
 
     /**
      * Image font file
@@ -115,17 +115,8 @@ class Image extends Word
      * @var int
      */
     protected $_expiration = 100;
-
-    /**
-     * Number of noise dots on image
-     * Used twice - before and after transform
-     *
-     * @var int
-     */
-    protected $_dotNoiseLevel = 50;
     /**
      * Number of noise lines on image
-     * Used twice - before and after transform
      *
      * @var int
      */
@@ -143,13 +134,6 @@ class Image extends Word
     public function getStartImage ()
     {
         return $this->_startImage;
-    }
-    /**
-     * @return int
-     */
-    public function getDotNoiseLevel ()
-    {
-        return $this->_dotNoiseLevel;
     }
     /**
      * @return int
@@ -249,14 +233,6 @@ class Image extends Word
     public function setStartImage ($startImage)
     {
         $this->_startImage = $startImage;
-        return $this;
-    }
-    /**
-     * @param int $dotNoiseLevel
-     */
-    public function setDotNoiseLevel ($dotNoiseLevel)
-    {
-        $this->_dotNoiseLevel = $dotNoiseLevel;
         return $this;
     }
    /**
@@ -441,7 +417,7 @@ class Image extends Word
      * Generate image captcha
      *
      * Override this function if you want different image generator
-     * Wave transform from http://www.captcha.ru/captchas/multiwave/
+     * From Kohana 3.x Captcha module
      *
      * @param string $id Captcha ID
      * @param string $word Captcha word
@@ -481,86 +457,97 @@ class Image extends Word
             $w = imagesx($img);
             $h = imagesy($img);
         }
-        $text_color = imagecolorallocate($img, 0, 0, 0);
-        $bg_color   = imagecolorallocate($img, 255, 255, 255);
-        imagefilledrectangle($img, 0, 0, $w-1, $h-1, $bg_color);
-        $textbox = imageftbbox($fsize, 0, $font, $word);
-        $x = ($w - ($textbox[2] - $textbox[0])) / 2;
-        $y = ($h - ($textbox[7] - $textbox[1])) / 2;
-        imagefttext($img, $fsize, 0, $x, $y, $text_color, $font, $word);
+        
+        
+        $color1 = imagecolorallocate($img, mt_rand(200, 255), mt_rand(200, 255), mt_rand(150, 255));
+        $color2 = imagecolorallocate($img, mt_rand(200, 255), mt_rand(200, 255), mt_rand(150, 255));
+        $directions = array('horizontal', 'vertical');
+        $direction = 'horizontal';
+        // Pick a random direction if needed
+        if ( ! in_array($direction, $directions))
+        {
+            $direction = $directions[array_rand($directions)];
 
-       // generate noise
-        for ($i=0; $i<$this->_dotNoiseLevel; $i++) {
-           imagefilledellipse($img, mt_rand(0,$w), mt_rand(0,$h), 2, 2, $text_color);
-        }
-        for($i=0; $i<$this->_lineNoiseLevel; $i++) {
-           imageline($img, mt_rand(0,$w), mt_rand(0,$h), mt_rand(0,$w), mt_rand(0,$h), $text_color);
-        }
-
-        // transformed image
-        $img2     = imagecreatetruecolor($w, $h);
-        $bg_color = imagecolorallocate($img2, 255, 255, 255);
-        imagefilledrectangle($img2, 0, 0, $w-1, $h-1, $bg_color);
-        // apply wave transforms
-        $freq1 = $this->_randomFreq();
-        $freq2 = $this->_randomFreq();
-        $freq3 = $this->_randomFreq();
-        $freq4 = $this->_randomFreq();
-
-        $ph1 = $this->_randomPhase();
-        $ph2 = $this->_randomPhase();
-        $ph3 = $this->_randomPhase();
-        $ph4 = $this->_randomPhase();
-
-        $szx = $this->_randomSize();
-        $szy = $this->_randomSize();
-
-        for ($x = 0; $x < $w; $x++) {
-            for ($y = 0; $y < $h; $y++) {
-                $sx = $x + (sin($x*$freq1 + $ph1) + sin($y*$freq3 + $ph3)) * $szx;
-                $sy = $y + (sin($x*$freq2 + $ph2) + sin($y*$freq4 + $ph4)) * $szy;
-
-                if ($sx < 0 || $sy < 0 || $sx >= $w - 1 || $sy >= $h - 1) {
-                    continue;
-                } else {
-                    $color    = (imagecolorat($img, $sx, $sy) >> 16)         & 0xFF;
-                    $color_x  = (imagecolorat($img, $sx + 1, $sy) >> 16)     & 0xFF;
-                    $color_y  = (imagecolorat($img, $sx, $sy + 1) >> 16)     & 0xFF;
-                    $color_xy = (imagecolorat($img, $sx + 1, $sy + 1) >> 16) & 0xFF;
-                }
-                if ($color == 255 && $color_x == 255 && $color_y == 255 && $color_xy == 255) {
-                    // ignore background
-                    continue;
-                } elseif ($color == 0 && $color_x == 0 && $color_y == 0 && $color_xy == 0) {
-                    // transfer inside of the image as-is
-                    $newcolor = 0;
-                } else {
-                    // do antialiasing for border items
-                    $frac_x  = $sx-floor($sx);
-                    $frac_y  = $sy-floor($sy);
-                    $frac_x1 = 1-$frac_x;
-                    $frac_y1 = 1-$frac_y;
-
-                    $newcolor = $color    * $frac_x1 * $frac_y1
-                              + $color_x  * $frac_x  * $frac_y1
-                              + $color_y  * $frac_x1 * $frac_y
-                              + $color_xy * $frac_x  * $frac_y;
-                }
-                imagesetpixel($img2, $x, $y, imagecolorallocate($img2, $newcolor, $newcolor, $newcolor));
+            // Switch colors
+            if (mt_rand(0, 1) === 1)
+            {
+                $temp = $color1;
+                $color1 = $color2;
+                $color2 = $temp;
             }
         }
 
-        // generate noise
-        for ($i=0; $i<$this->_dotNoiseLevel; $i++) {
-            imagefilledellipse($img2, mt_rand(0,$w), mt_rand(0,$h), 2, 2, $text_color);
+        // Extract RGB values
+        $color1 = imagecolorsforindex($img, $color1);
+        $color2 = imagecolorsforindex($img, $color2);
+
+        // Preparations for the gradient loop
+        
+        $steps = ($direction === 'horizontal') ? $w : $h;
+
+        $r1 = ($color1['red'] - $color2['red']) / $steps;
+        $g1 = ($color1['green'] - $color2['green']) / $steps;
+        $b1 = ($color1['blue'] - $color2['blue']) / $steps;
+
+        if ($direction === 'horizontal')
+        {
+            $x1 =& $i;
+            $y1 = 0;
+            $x2 =& $i;
+            $y2 = $h;
         }
-        for ($i=0; $i<$this->_lineNoiseLevel; $i++) {
-           imageline($img2, mt_rand(0,$w), mt_rand(0,$h), mt_rand(0,$w), mt_rand(0,$h), $text_color);
+        else
+        {
+            $x1 = 0;
+            $y1 =& $i;
+            $x2 = $w;
+            $y2 =& $i;
         }
 
-        imagepng($img2, $img_file);
+        // Execute the gradient loop
+        for ($i = 0; $i <= $steps; $i++)
+        {
+            $r2 = $color1['red'] - floor($i * $r1);
+            $g2 = $color1['green'] - floor($i * $g1);
+            $b2 = $color1['blue'] - floor($i * $b1);
+            $color = imagecolorallocate($img, $r2, $g2, $b2);
+
+            imageline($img, $x1, $y1, $x2, $y2, $color);
+        }
+        
+        $default_size = min($w, $h * 2) / (strlen($word) + 1);
+        // Draw each Captcha character with varying attributes
+        for ($i = 0, $strlen = strlen($word); $i < $strlen; $i++)
+        {
+            // Use different fonts if available
+            $font = $font;
+
+            // Allocate random color, size and rotation attributes to text
+            $color = imagecolorallocate($img, mt_rand(0, 150), mt_rand(0, 150), mt_rand(0, 150));
+            $angle = mt_rand(-40, 20);
+            
+            // Scale the character size on image height
+            $size = $default_size / 10 * mt_rand(8, 12);
+            $box = imageftbbox($size, $angle, $font, $word[$i]);
+
+            // Calculate character starting coordinates
+            $spacing = (int) $w * 0.9 / strlen($word);
+            $box = imageftbbox($size, 0, $font, $word);
+            $x = $spacing / 4 + $i * $spacing;
+            $y = $h / 2 + ($box[2] - $box[5]) / 10;
+
+            // Write text character to image
+            imagefttext($img, $size, $angle, $x, $y, $color, $font, $word[$i]);
+        }
+        // add a few lines
+        for ($i = 0, $count = mt_rand(5, $this->_lineNoiseLevel * 4); $i < $count; $i++)
+        {
+            $color = imagecolorallocatealpha($img, mt_rand(0, 255), mt_rand(0, 255), mt_rand(100, 255), mt_rand(50, 120));
+            imageline($img, mt_rand(0, $w), 0, mt_rand(0,$w), $h, $color);
+        }
+
+        imagepng($img, $img_file);
         imagedestroy($img);
-        imagedestroy($img2);
     }
 
     /**
@@ -597,7 +584,7 @@ class Image extends Word
      */
     public function render(\Zend\View\ViewEngine $view = null, $element = null)
     {
-    	$this->generate();
+        $this->generate();
         return '<img width="' . $this->getWidth() . '" height="' . $this->getHeight() . '" alt="' . $this->getImgAlt()
              . '" src="' . $this->getImgUrl() . $this->getId() . $this->getSuffix() . '" />';
     }
